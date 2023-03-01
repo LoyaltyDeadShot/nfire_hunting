@@ -19,10 +19,11 @@ AddEventHandler('esx:playerLoaded',function ()
     TriggerEvent('nfire_hunting:CarryCarcass')
 end)
 
-exports.qtarget:AddTargetModel(animals, {
+exports.ox_target:addModel(animals, {
     options = {
         {
-            action = function (entity)
+            name = 'ox:option1',
+            onSelect = function(entity)
                 TriggerEvent('ox_inventory:disarm')
                 local retval, bone = GetPedLastDamageBone(entity)
                 TaskTurnPedToFaceEntity(PlayerPedId(), entity, -1)
@@ -51,21 +52,20 @@ exports.qtarget:AddTargetModel(animals, {
             end,
             icon = "fa-solid fa-paw",
             label = locale('pickup_carcass'),
-            canInteract = function (entity)
-                return IsEntityDead(entity) and not IsEntityAMissionEntity(entity)
+            canInteract = function (entity, distance)
+                return IsEntityDead(entity), distance < 3 and not IsEntityAMissionEntity(entity)
             end
         },
     },
-    distance = 2
 })
 
-AddEventHandler('nfire_hunting:CarryCarcass',function ()
+AddEventHandler('nfire_hunting:CarryCarcass',function()
     TriggerEvent('ox_inventory:disarm')
     FreezeEntityPosition(playerPed, false)
     heaviestCarcass = 0
     local carcassCount = 0
     for key, value in pairs(exports.ox_inventory:Search('count', listItemCarcass)) do
-        carcassCount += value
+        carcassCount = carcassCount + value
     end
     if carcassCount > 0 then
         local inventory = exports.ox_inventory:Search('slots', listItemCarcass)
@@ -158,9 +158,19 @@ function CustomControl()
 end
 
 
+
+RegisterNetEvent('nfire_hunting:notify', function(type)
+    local notification = {
+        ['toofar'] = {type = 'error', description = locale('too_far')},
+        ['stopfarm'] = {type = 'error', description = locale('stop_farm')},
+    } 
+    return lib.notify({description = notification[type].description, type = notification[type].type})
+end
+)
+
 --------------------- SELL -----------------------------------
 
-exports.qtarget:AddBoxZone("nfire_hunting_sell",vector3(963.34, -2115.39, 31.47), 6.8, 1, {
+exports.ox_target:AddBoxZone("nfire_hunting_sell",vector3(963.34, -2115.39, 31.47), 6.8, 1, {
     name="nfire_hunting_sell",
     heading=355,
     --debugPoly=true,
@@ -169,7 +179,7 @@ exports.qtarget:AddBoxZone("nfire_hunting_sell",vector3(963.34, -2115.39, 31.47)
 	}, {
 		options = {
 			{
-				action = function ()
+				onSelect = function ()
                     exports.ox_inventory:Progress({
                         duration = 3000,
                         label = locale('sell_in_progress'),

@@ -1,12 +1,6 @@
 lib.locale()
 local antifarm = {}
 
-lib.versionCheck('N-fire/nfire_hunting')
-if not lib.checkDependency('ox_lib', '2.1.0') then error('You don\'t have latest version of ox_lib') end
-if not lib.checkDependency('ox_inventory', '2.7.4') then error('You don\'t have latest version of ox_inventory') end
-if not lib.checkDependency('qtarget', '2.1.0') then error('You don\'t have latest version of qtarget') end
-
-
 RegisterNetEvent('nfire_hunting:harvestCarcass')
 AddEventHandler('nfire_hunting:harvestCarcass',function (entityId, bone)
     local playerCoords = GetEntityCoords(GetPlayerPed(source))
@@ -31,10 +25,10 @@ AddEventHandler('nfire_hunting:harvestCarcass',function (entityId, bone)
                 DeleteEntity(entity)
             end
         else
-            TriggerClientEvent('ox_inventory:notify', source, {type = 'error', text = locale('stop_farm')})
+            TriggerClientEvent('nfire_hunting:notify', source, 'stopfarm')
         end
     else
-        TriggerClientEvent('ox_inventory:notify', source, {type = 'error', text = locale('too_far')})
+        TriggerClientEvent('nfire_hunting:notify', source, 'toofar')
     end
 end)
 
@@ -86,7 +80,7 @@ function Antifarm(source,coords)
             if antifarm[source][i].amount >= Config.antiFarm.maxAmount then -- if amount more than max
                 return false
             end
-            antifarm[source][i].amount += 1 -- if not amount more than max
+            antifarm[source][i].amount = antifarm[source][i].amount + 1 -- if not amount more than max
             antifarm[source][i].time = curentTime
             return true
         end
