@@ -1,9 +1,9 @@
 {
-    "pickup_carcass": "Pick up carcass",
+    "pickup_carcass": "Pick up Carcass",
     "cant_carry_item": "You can not carry this",
-    "sell_carcass": "Sell carcass",
-    "sell_in_progress": "Sell in progress ...",
-    "blip_name": "Carcass Sell",
+    "sell_carcass": "Sell Carcass",
+    "sell_in_progress": "Making the best deal...",
+    "blip_name": "Slaughterhouse",
     "too_far": "You are too far from the carcass",
-    "stop_farm": "Respect the biodiversity change of place"
+    "stop_farm": "The animals have been scared off- you'll need to hunt somewhere else."
 }

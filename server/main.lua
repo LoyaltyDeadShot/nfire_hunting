@@ -11,15 +11,25 @@ AddEventHandler('nfire_hunting:harvestCarcass',function (entityId, bone)
             local weapon = GetPedCauseOfDeath(entity)
             local item = Config.carcass[GetEntityModel(entity)]
             local grade = '★☆☆'
+            local gradescale = 1
             local image =  item..1
+            
             if InTable(Config.goodWeapon, weapon) then
+                gradescale = gradescale+1
+            end
+
+            if InTable(Config.headshotBones[GetEntityModel(entity)], bone) then
+                gradescale = gradescale+1
+            end
+            
+            if gradescale == 2 then
                 grade = '★★☆'
                 image =  item..2
-                if InTable(Config.headshotBones[GetEntityModel(entity)],bone) then
-                    grade = '★★★'
-                    image =  item..3
-                end
+            elseif gradescale == 3 then
+                grade = '★★★'
+                image =  item..3
             end
+
             if exports.ox_inventory:CanCarryItem(source, item, 1) and DoesEntityExist(entity) and GetEntityAttachedTo(entity) == 0 then
                 exports.ox_inventory:AddItem(source, item, 1, {type = grade, image =  image})
                 DeleteEntity(entity)
@@ -33,11 +43,11 @@ AddEventHandler('nfire_hunting:harvestCarcass',function (entityId, bone)
 end)
 
 function InTable(table, value)
-    for i = 1, #table, 1 do
-        if table[i] == value then
+    for k,v in pairs(table) do
+        if v == value then
             return true
         end
-    end
+      end
     return false
 end
 
