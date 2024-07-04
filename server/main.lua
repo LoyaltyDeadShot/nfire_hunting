@@ -2,23 +2,23 @@ lib.locale()
 local antifarm = {}
 
 RegisterNetEvent('nfire_hunting:harvestCarcass')
-AddEventHandler('nfire_hunting:harvestCarcass',function (entityId, bone)
+AddEventHandler('nfire_hunting:harvestCarcass',function (entityId, bone, weaponGroup)
     local playerCoords = GetEntityCoords(GetPlayerPed(source))
     local entity = NetworkGetEntityFromNetworkId(entityId)
     local entityCoords = GetEntityCoords(entity)
     if #(playerCoords - entityCoords)< 5 then
         if Antifarm(source, entityCoords) then
-            local weapon = GetPedCauseOfDeath(entity)
-            local item = Config.carcass[GetEntityModel(entity)]
+            local model = GetEntityModel(entity)
+            local item = Config.carcass[model].item
             local grade = '★☆☆'
             local gradescale = 1
             local image =  item..1
             
-            if InTable(Config.goodWeapon, weapon) then
+            if InTable(Config.goodWeapon, weaponGroup) then
                 gradescale = gradescale+1
             end
 
-            if InTable(Config.headshotBones[GetEntityModel(entity)], bone) then
+            if InTable(Config.carcass[model].headshotBones, bone) then
                 gradescale = gradescale+1
             end
             
@@ -31,7 +31,7 @@ AddEventHandler('nfire_hunting:harvestCarcass',function (entityId, bone)
             end
 
             if exports.ox_inventory:CanCarryItem(source, item, 1) and DoesEntityExist(entity) and GetEntityAttachedTo(entity) == 0 then
-                exports.ox_inventory:AddItem(source, item, 1, {type = grade, image =  image})
+                exports.ox_inventory:AddItem(source, item, 1, {type = grade, image =  image, model = model})
                 DeleteEntity(entity)
             end
         else
@@ -55,7 +55,7 @@ RegisterNetEvent('nfire_hunting:SellCarcass')
 AddEventHandler('nfire_hunting:SellCarcass',function (item)
     local itemData = exports.ox_inventory:Search(source,'slots', item)[1]
     if itemData.count >= 1 then
-        local reward = Config.sellPrice[item].max * Config.gradeMultiplier[itemData.metadata.type]
+        local reward = Config.carcass[itemData.metadata.model].max * Config.gradeMultiplier[itemData.metadata.type]
         if Config.degrade and itemData.metadata.durability ~= nil then
             local currentTime = os.time()
             local maxTime = itemData.metadata.durability
@@ -63,7 +63,7 @@ AddEventHandler('nfire_hunting:SellCarcass',function (item)
             if currentTime >= maxTime then
                 currentTime = maxTime
             end
-            reward =math.floor(map(currentTime, maxTime, minTime, Config.sellPrice[item].min * Config.gradeMultiplier[itemData.metadata.type], Config.sellPrice[item].max * Config.gradeMultiplier[itemData.metadata.type]))
+            reward = math.floor(map(currentTime, maxTime, minTime, Config.sellPrice[item].min * Config.gradeMultiplier[itemData.metadata.type], Config.sellPrice[item].max * Config.gradeMultiplier[itemData.metadata.type]))
         end
         exports.ox_inventory:RemoveItem(source, item, 1, nil, itemData.slot)
         exports.ox_inventory:AddItem(source, 'money', reward)
@@ -103,23 +103,25 @@ function map(x, in_min, in_max, out_min, out_max)
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 end
 
--- lib.addCommand('group.admin', 'giveCarcass', function(source, args)
---     for key, value in pairs(Config.carcass) do
---         exports.ox_inventory:AddItem(source, value, 1, {type = '★☆☆', image =  value..1})
---         exports.ox_inventory:AddItem(source, value, 1, {type = '★★☆', image =  value..2})
---         exports.ox_inventory:AddItem(source, value, 1, {type = '★★★', image =  value..3})
---     end
--- end)
+if Config.debug then
+ lib.addCommand('group.admin', 'giveCarcass', function(source, args)
+     for key, value in pairs(Config.carcass) do
+         exports.ox_inventory:AddItem(source, value, 1, {type = '★☆☆', image =  value..1})
+         exports.ox_inventory:AddItem(source, value, 1, {type = '★★☆', image =  value..2})
+         exports.ox_inventory:AddItem(source, value, 1, {type = '★★★', image =  value..3})
+     end
+ end)
 
--- lib.addCommand('group.admin', 'spawnPed', function(source, args)
---     local playerCoords = GetEntityCoords(GetPlayerPed(source))
---     local entity = CreatePed(0, GetHashKey(args.hash), playerCoords, true, true)
--- end,{'hash:string'})
+ lib.addCommand('group.admin', 'spawnPed', function(source, args)
+     local playerCoords = GetEntityCoords(GetPlayerPed(source))
+     local entity = CreatePed(0, GetHashKey(args.hash), playerCoords, true, true)
+ end,{'hash:string'})
 
--- lib.addCommand('group.admin', 'printAntifarm', function(source, args)
---     print(json.encode(antifarm,{indent = true}))
--- end)
+ lib.addCommand('group.admin', 'printAntifarm', function(source, args)
+     print(json.encode(antifarm,{indent = true}))
+ end)
 
--- lib.addCommand('group.admin', 'printInv', function(source, args)
---     print(json.encode(exports.ox_inventory:Inventory(source).items,{indent = true}))
--- end)
+ lib.addCommand('group.admin', 'printInv', function(source, args)
+     print(json.encode(exports.ox_inventory:Inventory(source).items,{indent = true}))
+ end)
+end
