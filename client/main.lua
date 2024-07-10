@@ -199,22 +199,17 @@ for k, v in pairs(Config.salepoints) do
     })
 end
 
-Citizen.CreateThread(function()
-    blip = AddBlipForCoord(963.34, -2115.39)
-    SetBlipSprite(blip, 141)
-    SetBlipScale(blip, 0.8)
-    SetBlipColour(blip, 21)
-    SetBlipAsShortRange(blip, true)
-    BeginTextCommandSetBlipName('STRING')
-    AddTextComponentString(locale 'blip_name')
-    EndTextCommandSetBlipName(blip)
-
-    blip2 = AddBlipForCoord(-69.12, 6249.44)
-    SetBlipAsShortRange(blip2, true)
-    SetBlipSprite(blip2, 141)
-    SetBlipScale(blip2, 0.8)
-    SetBlipColour(blip2, 21)
-    BeginTextCommandSetBlipName('STRING')
-    AddTextComponentString(locale 'blip_name')
-    EndTextCommandSetBlipName(blip2)
+Citizen.CreateThread(function ()
+    for k,v in pairs(Config.salepoints) do
+        if v.blip then
+        local blip = AddBlipForCoord(v.location)
+            SetBlipSprite(blip, 141)
+            SetBlipScale(blip, 0.8)
+            SetBlipColour(kblip, 21)
+            SetBlipAsShortRange(blip, true)
+            BeginTextCommandSetBlipName('STRING')
+            AddTextComponentString(locale'blip_name')
+            EndTextCommandSetBlipName(blip)
+        end
+    end
 end)

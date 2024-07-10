@@ -54,8 +54,8 @@ Config = {
     },
 
     salepoints      = {
-        ['paleto'] = { location = vector3(-69.12, 6249.44, 31.05), radius = 2, payMultiplier = 1 },
-        ['city'] = { location = vector3(963.34, -2115.39, 31.47), radius = 2, payMultipler = 1.5 }
+        ['paleto'] = { location = vector3(-69.12, 6249.44, 31.05), radius = 2, payMultiplier = 1, blip = true },
+        ['city'] = { location = vector3(963.34, -2115.39, 31.47), radius = 2, payMultipler = 1.5, blip = true }
     },
 
     goodWeapon      = {
