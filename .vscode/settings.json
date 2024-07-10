@@ -1,8 +1,0 @@
-{
-    "Lua.diagnostics.globals": [
-        "RegisterNetEvent",
-        "AddEventHandler",
-        "TriggerEvent",
-        "exports"
-    ]
-}
