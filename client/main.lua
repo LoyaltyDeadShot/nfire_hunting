@@ -1,23 +1,97 @@
 lib.locale()
 local carryCarcass = 0
 local heaviestCarcass = 0
-
+local pedList = {}
+local spawnedList = {}
 local animals = {}
 local listItemCarcass = {}
-local CarcassByItem = {}
+local carcassByItem = {}
 for key, value in pairs(Config.carcass) do
     table.insert(animals, key)
     table.insert(listItemCarcass, value)
-    CarcassByItem[value] = key
+    carcassByItem[value] = key
 end
-RegisterNetEvent('ox:playerLoaded')
-AddEventHandler('ox:playerLoaded', function()
-    TriggerEvent('nfire_hunting:CarryCarcass')
-end)
-RegisterNetEvent('esx:playerLoaded')
-AddEventHandler('esx:playerLoaded', function()
-    TriggerEvent('nfire_hunting:CarryCarcass')
-end)
+
+local function customControl()
+    Citizen.CreateThread(function()
+        local playerPed = PlayerPedId()
+        local enable = true
+
+        while enable do
+            if IsControlPressed(0, 35) then -- Right
+                FreezeEntityPosition(playerPed, false)
+                SetEntityHeading(playerPed, GetEntityHeading(playerPed) + 0.5)
+            elseif IsControlPressed(0, 34) then -- Left
+                FreezeEntityPosition(playerPed, false)
+                SetEntityHeading(playerPed, GetEntityHeading(playerPed) - 0.5)
+            elseif IsControlPressed(0, 32) or IsControlPressed(0, 33) then
+                FreezeEntityPosition(playerPed, false)
+            else
+                FreezeEntityPosition(playerPed, true)
+                TaskPlayAnim(PlayerPedId(), 'combat@drag_ped@', 'injured_drag_plyr', 0.0, 0.0, 1, 2, 7, false, false, false)
+            end
+            Wait(7)
+            if heaviestCarcass ~= 0 then
+                enable = Config.carcass[heaviestCarcass].pos.drag
+            else
+                enable = false
+            end
+        end
+        FreezeEntityPosition(playerPed, false)
+        ClearPedSecondaryTask(playerPed)
+        ClearPedTasksImmediately(playerPed)
+    end)
+end
+
+local function playCarryAnim()
+    if carryCarcass ~= 0 then
+        if Config.carcass[heaviestCarcass].pos.drag then
+            lib.requestAnimDict('combat@drag_ped@')
+            TaskPlayAnim(PlayerPedId(), 'combat@drag_ped@', 'injured_drag_plyr', 2.0, 2.0, 100000, 1, 0, false, false, false)
+            customControl()
+            while carryCarcass ~= 0 do
+                while not IsEntityPlayingAnim(PlayerPedId(), 'combat@drag_ped@', 'injured_drag_plyr', 1) do
+                    TaskPlayAnim(PlayerPedId(), 'combat@drag_ped@', 'injured_drag_plyr', 2.0, 2.0, 100000, 1, 0, false, false, false)
+                    Wait(0)
+                end
+                Wait(500)
+            end
+        else
+            lib.requestAnimDict('missfinale_c2mcs_1')
+            TaskPlayAnim(PlayerPedId(), 'missfinale_c2mcs_1', 'fin_c2_mcs_1_camman', 8.0, -8.0, 100000, 49, 0, false, false, false)
+            while carryCarcass ~= 0 do
+                while not IsEntityPlayingAnim(PlayerPedId(), 'missfinale_c2mcs_1', 'fin_c2_mcs_1_camman', 49) do
+                    TaskPlayAnim(PlayerPedId(), 'missfinale_c2mcs_1', 'fin_c2_mcs_1_camman', 8.0, -8.0, 100000, 49, 0, false, false, false)
+                    Wait(0)
+                end
+                Wait(500)
+            end
+        end
+    else
+        ClearPedSecondaryTask(PlayerPedId())
+    end
+end
+
+local function spawnPed(pedID) 
+    local model = pedList[pedID].model
+    local coords = pedList[pedID].coords
+    local anim = pedList[pedID].anim
+    local time = 1000
+    if not HasModelLoaded(model) then
+        while not HasModelLoaded(model) do
+            if time > 0 then time = time - 1 RequestModel(model) else time = 1000 break end Wait(10)
+        end
+    end 
+    local ped = CreatePed(4, GetHashKey(model), coords.x, coords.y, coords.z, coords.w, false, true)
+    SetEntityHeading(ped, coords.w)
+    FreezeEntityPosition(ped, true)
+    SetEntityInvincible(ped, true)
+    SetBlockingOfNonTemporaryEvents(ped, true)
+    TaskStartScenarioInPlace(ped, anim.scenario, 0, true)
+    spawnedList[pedID] = ped
+
+    return ped
+end
 
 local options = {
     {
@@ -49,7 +123,7 @@ local options = {
                 }) then
                 local weapon = GetPedCauseOfDeath(data.entity)
                 local weaponGroup = GetWeapontypeGroup(weapon)
-                TriggerServerEvent('nfire_hunting:harvestCarcass', NetworkGetNetworkIdFromEntity(data.entity), bone, weaponGroup)
+                TriggerServerEvent('nfire_hunting:server:harvestCarcass', NetworkGetNetworkIdFromEntity(data.entity), bone, weaponGroup)
             end
         end,
         canInteract = function(entity)
@@ -60,7 +134,11 @@ local options = {
 
 exports.ox_target:addModel(animals, options)
 
-AddEventHandler('nfire_hunting:CarryCarcass', function()
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
+    TriggerEvent('nfire_hunting:client:CarryCarcass')
+end)
+
+AddEventHandler('nfire_hunting:client:CarryCarcass', function()
     TriggerEvent('ox_inventory:disarm')
     FreezeEntityPosition(playerPed, false)
     heaviestCarcass = 0
@@ -74,7 +152,7 @@ AddEventHandler('nfire_hunting:CarryCarcass', function()
         for key, value in pairs(inventory) do
             if next(value) ~= nil and value[1].weight > weight then
                 weight = value[1].weight
-                heaviestCarcass = CarcassByItem[key]
+                heaviestCarcass = carcassByItem[key]
             end
         end
 
@@ -85,86 +163,18 @@ AddEventHandler('nfire_hunting:CarryCarcass', function()
         SetEntityHealth(carryCarcass, 0)
         local pos = Config.carcass[heaviestCarcass].pos
         AttachEntityToEntity(carryCarcass, PlayerPedId(), 11816, pos.coords, pos.rotate, false, false, false, true, 2, true)
-        PlayCarryAnim()
+        playCarryAnim()
     else
         DeleteEntity(carryCarcass)
         carryCarcass = 0
-        PlayCarryAnim()
+        playCarryAnim()
     end
 end)
+
 RegisterCommand('carcass', function()
     lib.requestAnimDict('amb@medic@standing@kneel@idle_a')
     TaskPlayAnim(PlayerPedId(), 'amb@medic@standing@kneel@idle_a', 'idle_a', 8.0, -8.0, 10000, 1, 0, false, false, false)
-end)
-
-
-function PlayCarryAnim()
-    if carryCarcass ~= 0 then
-        if Config.carcass[heaviestCarcass].pos.drag then
-            lib.requestAnimDict('combat@drag_ped@')
-            TaskPlayAnim(PlayerPedId(), 'combat@drag_ped@', 'injured_drag_plyr', 2.0, 2.0, 100000, 1, 0, false, false, false)
-            CustomControl()
-            while carryCarcass ~= 0 do
-                while not IsEntityPlayingAnim(PlayerPedId(), 'combat@drag_ped@', 'injured_drag_plyr', 1) do
-                    TaskPlayAnim(PlayerPedId(), 'combat@drag_ped@', 'injured_drag_plyr', 2.0, 2.0, 100000, 1, 0, false, false, false)
-                    Wait(0)
-                end
-                Wait(500)
-            end
-        else
-            lib.requestAnimDict('missfinale_c2mcs_1')
-            TaskPlayAnim(PlayerPedId(), 'missfinale_c2mcs_1', 'fin_c2_mcs_1_camman', 8.0, -8.0, 100000, 49, 0, false, false, false)
-            while carryCarcass ~= 0 do
-                while not IsEntityPlayingAnim(PlayerPedId(), 'missfinale_c2mcs_1', 'fin_c2_mcs_1_camman', 49) do
-                    TaskPlayAnim(PlayerPedId(), 'missfinale_c2mcs_1', 'fin_c2_mcs_1_camman', 8.0, -8.0, 100000, 49, 0, false, false, false)
-                    Wait(0)
-                end
-                Wait(500)
-            end
-        end
-    else
-        ClearPedSecondaryTask(PlayerPedId())
-    end
-end
-
-function CustomControl()
-    Citizen.CreateThread(function()
-        local playerPed = PlayerPedId()
-        local enable = true
-
-        while enable do
-            if IsControlPressed(0, 35) then -- Right
-                FreezeEntityPosition(playerPed, false)
-                SetEntityHeading(playerPed, GetEntityHeading(playerPed) + 0.5)
-            elseif IsControlPressed(0, 34) then -- Left
-                FreezeEntityPosition(playerPed, false)
-                SetEntityHeading(playerPed, GetEntityHeading(playerPed) - 0.5)
-            elseif IsControlPressed(0, 32) or IsControlPressed(0, 33) then
-                FreezeEntityPosition(playerPed, false)
-            else
-                FreezeEntityPosition(playerPed, true)
-                TaskPlayAnim(PlayerPedId(), 'combat@drag_ped@', 'injured_drag_plyr', 0.0, 0.0, 1, 2, 7, false, false, false)
-            end
-            Wait(7)
-            if heaviestCarcass ~= 0 then
-                enable = Config.carcass[heaviestCarcass].pos.drag
-            else
-                enable = false
-            end
-        end
-        FreezeEntityPosition(playerPed, false)
-        ClearPedSecondaryTask(playerPed)
-        ClearPedTasksImmediately(playerPed)
-    end)
-end
-
-RegisterNetEvent('nfire_hunting:notify', function(type)
-    local notification = {
-        ['toofar'] = { type = 'error', description = locale('too_far') },
-        ['stopfarm'] = { type = 'error', description = locale('stop_farm') },
-    }
-    return lib.notify({ description = notification[type].description, type = notification[type].type })
-end)
+end, true)
 
 --------------------- SELL -----------------------------------
 for k, v in pairs(Config.salepoints) do
@@ -189,7 +199,7 @@ for k, v in pairs(Config.salepoints) do
                                 mouse = false
                             },
                         }) then
-                        TriggerServerEvent('nfire_hunting:SellCarcass', Config.carcass[heaviestCarcass])
+                        TriggerServerEvent('nfire_hunting:server:SellCarcass', Config.carcass[heaviestCarcass])
                     end
                 end,
                 items = listItemCarcass,
@@ -212,4 +222,31 @@ Citizen.CreateThread(function ()
             EndTextCommandSetBlipName(blip)
         end
     end
+end)
+
+Citizen.CreateThread(function()
+    local function onEnter(self)
+        spawnPed(self.id)
+    end
+    local function onExit(self)
+        DeleteEntity(spawnedList[self.id])
+    end
+
+end)
+
+RegisterNetEvent('nfire_hunting:client:applytag')
+AddEventHandler('nfire_hunting:client:applytag', function()
+    lib.progressBar({
+        duration = 6000,
+        label = 'Tagging Animal..',
+        useWhileDead = false,
+        canCancel = false,
+        disable = {
+            car = true,
+        },
+        anim = {
+            dict = 'amb@prop_human_parking_meter@male@base',
+            clip = 'base'
+        },
+    })
 end)
