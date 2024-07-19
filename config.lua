@@ -77,31 +77,3 @@ Config = {
         enable = true, size = 70.0, time = 10 * 60, maxAmount = 3, personal = true
     },
 }
-
-
-function NotifyFunction(source, text, type)
-    TriggerClientEvent('QBCore:Notify', source, text, type)
-end
-
-function HasHuntingLicense(source)
-    -- Pickles Documents
-    local idcard = exports.ox_inventory:Search(source, 'slots', 'id_card')
-    if idcard then
-        for k, v in pairs(idcard) do
-            if v.metadata.documentName == "Hunting" then
-                return true
-            end
-        end
-        return false
-    end
-end
-
-function GetCitizenInfo(source)
-    -- QbCore
-    local player = QBCore.Functions.GetPlayerBySource(source)
-    local citizen = {
-        citizenid = player.PlayerData.citizenid,
-        fullname = player.PlayerData.charinfo.firstname .. " " .. player.PlayerData.charinfo.lastname    
-    }
-    return citizen
-end

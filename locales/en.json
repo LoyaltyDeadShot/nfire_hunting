@@ -5,7 +5,5 @@
     "sell_in_progress": "Making the best deal...",
     "blip_name": "Slaughterhouse",
     "too_far": "You are too far from the carcass",
-    "stop_farm": "The animals have been scared off- you'll need to hunt somewhere else.",
-    "missing_license": "You do not have a valid hunting license",
-    "missing_tags": "You already received your tags today!"
+    "stop_farm": "The animals have been scared off- you'll need to hunt somewhere else."
 }

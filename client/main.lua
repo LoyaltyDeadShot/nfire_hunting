@@ -1,16 +1,19 @@
 lib.locale()
 local carryCarcass = 0
 local heaviestCarcass = 0
-local pedList = {}
-local spawnedList = {}
+
 local animals = {}
 local listItemCarcass = {}
-local carcassByItem = {}
+local CarcassByItem = {}
 for key, value in pairs(Config.carcass) do
     table.insert(animals, key)
     table.insert(listItemCarcass, value)
-    carcassByItem[value] = key
+    CarcassByItem[value] = key
 end
+
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
+    TriggerEvent('nfire_hunting:client:CarryCarcass')
+end)
 
 local function customControl()
     Citizen.CreateThread(function()
@@ -72,27 +75,6 @@ local function playCarryAnim()
     end
 end
 
-local function spawnPed(pedID) 
-    local model = pedList[pedID].model
-    local coords = pedList[pedID].coords
-    local anim = pedList[pedID].anim
-    local time = 1000
-    if not HasModelLoaded(model) then
-        while not HasModelLoaded(model) do
-            if time > 0 then time = time - 1 RequestModel(model) else time = 1000 break end Wait(10)
-        end
-    end 
-    local ped = CreatePed(4, GetHashKey(model), coords.x, coords.y, coords.z, coords.w, false, true)
-    SetEntityHeading(ped, coords.w)
-    FreezeEntityPosition(ped, true)
-    SetEntityInvincible(ped, true)
-    SetBlockingOfNonTemporaryEvents(ped, true)
-    TaskStartScenarioInPlace(ped, anim.scenario, 0, true)
-    spawnedList[pedID] = ped
-
-    return ped
-end
-
 local options = {
     {
         label = locale('pickup_carcass'),
@@ -134,10 +116,6 @@ local options = {
 
 exports.ox_target:addModel(animals, options)
 
-RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
-    TriggerEvent('nfire_hunting:client:CarryCarcass')
-end)
-
 AddEventHandler('nfire_hunting:client:CarryCarcass', function()
     TriggerEvent('ox_inventory:disarm')
     FreezeEntityPosition(playerPed, false)
@@ -152,7 +130,7 @@ AddEventHandler('nfire_hunting:client:CarryCarcass', function()
         for key, value in pairs(inventory) do
             if next(value) ~= nil and value[1].weight > weight then
                 weight = value[1].weight
-                heaviestCarcass = carcassByItem[key]
+                heaviestCarcass = CarcassByItem[key]
             end
         end
 
@@ -224,15 +202,6 @@ Citizen.CreateThread(function ()
     end
 end)
 
-Citizen.CreateThread(function()
-    local function onEnter(self)
-        spawnPed(self.id)
-    end
-    local function onExit(self)
-        DeleteEntity(spawnedList[self.id])
-    end
-
-end)
 
 RegisterNetEvent('nfire_hunting:client:applytag')
 AddEventHandler('nfire_hunting:client:applytag', function()
