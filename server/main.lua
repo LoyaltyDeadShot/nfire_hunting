@@ -1,9 +1,13 @@
 local ox_inventory = exports.ox_inventory
-lib.locale()
 local antifarm = {}
 local issuedTags = {}
 local QBCore = exports['qb-core']:GetCoreObject()
+lib.locale()
 
+local hashList = {}
+for k, v in pairs(Config.carcass) do
+    hashList[GetHashKey(k)] = k
+end
 
 local function inTable(table, value)
     for k, v in pairs(table) do
@@ -53,7 +57,7 @@ AddEventHandler('nfire_hunting:server:harvestCarcass', function(entityId, bone, 
     local entityCoords = GetEntityCoords(entity)
     if #(playerCoords - entityCoords) < 5 then
         if antifarmFunction(source, entityCoords) then
-            local model = GetEntityModel(entity)
+            local model = hashList[GetEntityModel(entity)]
             local item = Config.carcass[model].item
             local grade = '★☆☆'
             local gradescale = 1
@@ -80,10 +84,10 @@ AddEventHandler('nfire_hunting:server:harvestCarcass', function(entityId, bone, 
                 DeleteEntity(entity)
             end
         else
-            TriggerClientEvent('QBCore:Notify', source, locale['stop_farm'], 'error')
+            NotifyFunction(source, locale['stop_farm'], 'error')
         end
     else
-        TriggerClientEvent('QBCore:Notify', source, locale['too_far'], 'error')
+        NotifyFunction(source, locale['too_far'], 'error')
     end
 end)
 
@@ -112,22 +116,10 @@ local function tagAnimal(payload)
     TriggerClientEvent('ox_inventory:closeInventory', src)
     TriggerClientEvent('nfire_hunting:client:applytag', src)
     payload.toSlot.metadata.tagged = true
-    payload.toSlot.metadata.description = payload.toSlot.metadata.description .. "  \n"..payload.fromSlot.metadata.description
+    payload.toSlot.metadata.description = payload.toSlot.metadata.description .. "  \n" .. payload.fromSlot.metadata.description
     Wait(6000)
     ox_inventory:RemoveItem(src, 'tag', 1, payload.from.metadata)
     ox_inventory:SetMetadata(src, payload.toSlot.metadata, payload.toSlot.metadata)
-end
-
-local function hasHuntingLicense(source)
-    local idcard = exports.ox_inventory:Search(source, 'slots', 'id_card')
-    if idcard then
-        for k,v in pairs(idcard) do
-            if v.metadata.documentName == "Hunting" then
-                return true
-            end
-        end
-        return false
-    end
 end
 
 local tagHook = ox_inventory:registerHook('swapItems', function(payload)
@@ -146,21 +138,19 @@ local tagHook = ox_inventory:registerHook('swapItems', function(payload)
 RegisterNetEvent('nfire_hunting:server:issuetag')
 AddEventHandler('nfire_hunting:server:issuetag', function()
     local src = source
-    local player = QBCore.Functions.GetPlayerBySource(src)
-    if hasHuntingLicense(source) then
-        if not issuedTags[player.PlayerData.citizenid] then
-            local tagDate = os.date("%m/%d/%y @ %I:%M")
-            local tagName = player.PlayerData.charinfo.firstname.." "..player.PlayerData.charinfo.lastname
+    local citizen = GetCitizenInfo(src)
+    if HasHuntingLicense(source) then
+        if not issuedTags[citizen.citizenid] then
             local metadata = {
-                description = "Authorized To: "..tagName.."  \nIssued Date: "..tagDate
+                description = "Authorized To: " .. citizen.fullname .. "  \nIssued Date: " .. os.date("%m/%d/%y @ %I:%M")
             }
-            issuedTags[player.PlayerData.citizenid] = true
+            issuedTags[citizen.citizenid] = true
             exports.ox_inventory:AddItem(src, 'tag', 6, metadata)
         else
-            TriggerClientEvent('QBCore:Notify', src, "You already received your tags today!", 'error')
+            NotifyFunction(src, locale["received_tags"], 'error')
         end
     else
-        TriggerClientEvent('QBCore:Notify', src, "You do not have a valid hunting license", 'error')
+        NotifyFunction(src, locale["missing_license"], 'error')
     end
 end)
 

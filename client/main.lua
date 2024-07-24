@@ -1,19 +1,14 @@
 lib.locale()
 local carryCarcass = 0
 local heaviestCarcass = 0
-
-local animals = {}
-local listItemCarcass = {}
-local CarcassByItem = {}
+local animalModel = {}
+local animalItems = {}
+local carcassByItem = {}
 for key, value in pairs(Config.carcass) do
-    table.insert(animals, key)
-    table.insert(listItemCarcass, value)
-    CarcassByItem[value] = key
+    animalModel[#animalModel + 1] = key
+    animalItems[#animalItems + 1] = value.item
+    carcassByItem[value.item] = key
 end
-
-RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
-    TriggerEvent('nfire_hunting:client:CarryCarcass')
-end)
 
 local function customControl()
     Citizen.CreateThread(function()
@@ -75,7 +70,7 @@ local function playCarryAnim()
     end
 end
 
-local options = {
+exports.ox_target:addModel(animalModel, {
     {
         label = locale('pickup_carcass'),
         name = 'ox:option1',
@@ -83,7 +78,7 @@ local options = {
         distance = 3.0,
         onSelect = function(data)
             TriggerEvent('ox_inventory:disarm')
-            local retval, bone = GetPedLastDamageBone(data.entity)
+            local _, bone = GetPedLastDamageBone(data.entity)
             TaskTurnPedToFaceEntity(PlayerPedId(), data.entity, -1)
             Wait(500)
             if lib.progressBar({
@@ -113,36 +108,46 @@ local options = {
         end
     },
 }
+)
 
-exports.ox_target:addModel(animals, options)
+AddEventHandler('ox_inventory:updateInventory', function(changes) 
+    TriggerEvent('nfire_hunting:client:CarryCarcass')
+end)
+
 
 AddEventHandler('nfire_hunting:client:CarryCarcass', function()
-    TriggerEvent('ox_inventory:disarm')
-    FreezeEntityPosition(playerPed, false)
-    heaviestCarcass = 0
     local carcassCount = 0
-    for key, value in pairs(exports.ox_inventory:Search('count', listItemCarcass)) do
+    local playerPed = PlayerPedId()
+    for key, value in pairs(exports.ox_inventory:Search('count', animalItems)) do
         carcassCount = carcassCount + value
     end
     if carcassCount > 0 then
-        local inventory = exports.ox_inventory:Search('slots', listItemCarcass)
-        local weight = 0
-        for key, value in pairs(inventory) do
-            if next(value) ~= nil and value[1].weight > weight then
-                weight = value[1].weight
-                heaviestCarcass = CarcassByItem[key]
+        TriggerEvent('ox_inventory:disarm')
+        FreezeEntityPosition(playerPed, false)
+        heaviestCarcass = 0
+        if carcassCount > 0 then
+            local inventory = exports.ox_inventory:Search('slots', animalItems)
+            if inventory then
+                local weight = 0
+                for key, value in pairs(inventory) do
+                    if next(value) ~= nil and value[1].weight > weight then
+                        weight = value[1].weight
+                        heaviestCarcass = carcassByItem[key]
+                    end
+                end
+
+                lib.requestModel(heaviestCarcass)
+                DeleteEntity(carryCarcass)
+                carryCarcass = CreatePed(1, heaviestCarcass, GetEntityCoords(playerPed), GetEntityHeading(playerPed), true, true)
+                SetEntityInvincible(carryCarcass, true)
+                SetEntityHealth(carryCarcass, 0)
+                local pos = Config.carcass[heaviestCarcass].pos
+                AttachEntityToEntity(carryCarcass, playerPed, 11816, pos.coords, pos.rotate, false, false, false, true, 2, true)
+                playCarryAnim()
             end
         end
-
-        lib.requestModel(heaviestCarcass)
-        DeleteEntity(carryCarcass)
-        carryCarcass = CreatePed(1, heaviestCarcass, GetEntityCoords(PlayerPedId()), GetEntityHeading(PlayerPedId()), true, true)
-        SetEntityInvincible(carryCarcass, true)
-        SetEntityHealth(carryCarcass, 0)
-        local pos = Config.carcass[heaviestCarcass].pos
-        AttachEntityToEntity(carryCarcass, PlayerPedId(), 11816, pos.coords, pos.rotate, false, false, false, true, 2, true)
-        playCarryAnim()
-    else
+    elseif carryCarcass ~= 0 then
+        heaviestCarcass = 0
         DeleteEntity(carryCarcass)
         carryCarcass = 0
         playCarryAnim()
@@ -180,28 +185,27 @@ for k, v in pairs(Config.salepoints) do
                         TriggerServerEvent('nfire_hunting:server:SellCarcass', Config.carcass[heaviestCarcass])
                     end
                 end,
-                items = listItemCarcass,
+                items = animalItems,
                 anyItem = true
             },
         },
     })
 end
 
-Citizen.CreateThread(function ()
-    for k,v in pairs(Config.salepoints) do
+Citizen.CreateThread(function()
+    for k, v in pairs(Config.salepoints) do
         if v.blip then
-        local blip = AddBlipForCoord(v.location)
+            local blip = AddBlipForCoord(v.location)
             SetBlipSprite(blip, 141)
             SetBlipScale(blip, 0.8)
             SetBlipColour(kblip, 21)
             SetBlipAsShortRange(blip, true)
             BeginTextCommandSetBlipName('STRING')
-            AddTextComponentString(locale'blip_name')
+            AddTextComponentString(locale 'blip_name')
             EndTextCommandSetBlipName(blip)
         end
     end
 end)
-
 
 RegisterNetEvent('nfire_hunting:client:applytag')
 AddEventHandler('nfire_hunting:client:applytag', function()
