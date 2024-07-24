@@ -25,7 +25,7 @@ ox_inventory : https://www.github.com/overextended/ox_inventory/releases/latest
 
 ox_lib : https://github.com/overextended/ox_lib/releases/latest
 
-qtarget : https://github.com/overextended/qtarget/releases/latest
+ox_target : https://github.com/overextended/ox_target/releases/latest
 
 Item to add :
 ```lua

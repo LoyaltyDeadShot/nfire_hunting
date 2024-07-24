@@ -1,73 +1,24 @@
-lib.locale()
+local ox_inventory = exports.ox_inventory
 local antifarm = {}
+local issuedTags = {}
+local QBCore = exports['qb-core']:GetCoreObject()
+lib.locale()
 
-lib.versionCheck('N-fire/nfire_hunting')
-if not lib.checkDependency('ox_lib', '2.1.0') then error('You don\'t have latest version of ox_lib') end
-if not lib.checkDependency('ox_inventory', '2.7.4') then error('You don\'t have latest version of ox_inventory') end
-if not lib.checkDependency('qtarget', '2.1.0') then error('You don\'t have latest version of qtarget') end
+local hashList = {}
+for k, v in pairs(Config.carcass) do
+    hashList[GetHashKey(k)] = k
+end
 
-
-RegisterNetEvent('nfire_hunting:harvestCarcass')
-AddEventHandler('nfire_hunting:harvestCarcass',function (entityId, bone)
-    local playerCoords = GetEntityCoords(GetPlayerPed(source))
-    local entity = NetworkGetEntityFromNetworkId(entityId)
-    local entityCoords = GetEntityCoords(entity)
-    if #(playerCoords - entityCoords)< 5 then
-        if Antifarm(source, entityCoords) then
-            local weapon = GetPedCauseOfDeath(entity)
-            local item = Config.carcass[GetEntityModel(entity)]
-            local grade = '★☆☆'
-            local image =  item..1
-            if InTable(Config.goodWeapon, weapon) then
-                grade = '★★☆'
-                image =  item..2
-                if InTable(Config.headshotBones[GetEntityModel(entity)],bone) then
-                    grade = '★★★'
-                    image =  item..3
-                end
-            end
-            if exports.ox_inventory:CanCarryItem(source, item, 1) and DoesEntityExist(entity) and GetEntityAttachedTo(entity) == 0 then
-                exports.ox_inventory:AddItem(source, item, 1, {type = grade, image =  image})
-                DeleteEntity(entity)
-            end
-        else
-            TriggerClientEvent('ox_inventory:notify', source, {type = 'error', text = locale('stop_farm')})
-        end
-    else
-        TriggerClientEvent('ox_inventory:notify', source, {type = 'error', text = locale('too_far')})
-    end
-end)
-
-function InTable(table, value)
-    for i = 1, #table, 1 do
-        if table[i] == value then
+local function inTable(table, value)
+    for k, v in pairs(table) do
+        if v == value then
             return true
         end
     end
     return false
 end
 
-RegisterNetEvent('nfire_hunting:SellCarcass')
-AddEventHandler('nfire_hunting:SellCarcass',function (item)
-    local itemData = exports.ox_inventory:Search(source,'slots', item)[1]
-    if itemData.count >= 1 then
-        local reward = Config.sellPrice[item].max * Config.gradeMultiplier[itemData.metadata.type]
-        if Config.degrade and itemData.metadata.durability ~= nil then
-            local currentTime = os.time()
-            local maxTime = itemData.metadata.durability
-            local minTime = maxTime - itemData.metadata.degrade * 60
-            if currentTime >= maxTime then
-                currentTime = maxTime
-            end
-            reward =math.floor(map(currentTime, maxTime, minTime, Config.sellPrice[item].min * Config.gradeMultiplier[itemData.metadata.type], Config.sellPrice[item].max * Config.gradeMultiplier[itemData.metadata.type]))
-        end
-        exports.ox_inventory:RemoveItem(source, item, 1, nil, itemData.slot)
-        exports.ox_inventory:AddItem(source, 'money', reward)
-    end
-end)
-
-
-function Antifarm(source,coords)
+local function antifarmFunction(source, coords)
     if Config.antiFarm.enable == false then return true end
     if Config.antiFarm.personal == false then
         source = 1
@@ -76,46 +27,152 @@ function Antifarm(source,coords)
     local curentTime = os.time()
     if not next(antifarm) or antifarm[source] == nil or not next(antifarm[source]) then -- table empty
         antifarm[source] = {}
-        table.insert(antifarm[source],{time = curentTime, coords = coords, amount= 1})
+        table.insert(antifarm[source], { time = curentTime, coords = coords, amount = 1 })
         return true
     end
     for i = 1, #antifarm[source], 1 do
-        if (curentTime - antifarm[source][i].time) > Config.antiFarm.time then -- delete old table
+        if (curentTime - antifarm[source][i].time) > Config.antiFarm.time then    -- delete old table
             table.remove(antifarm[source], i)
         elseif #(antifarm[source][i].coords - coords) < Config.antiFarm.size then -- if found table in coord
-            if antifarm[source][i].amount >= Config.antiFarm.maxAmount then -- if amount more than max
+            if antifarm[source][i].amount >= Config.antiFarm.maxAmount then       -- if amount more than max
                 return false
             end
-            antifarm[source][i].amount += 1 -- if not amount more than max
+            antifarm[source][i].amount = antifarm[source][i].amount + 1 -- if not amount more than max
             antifarm[source][i].time = curentTime
             return true
         end
     end
-    table.insert(antifarm[source],{time = curentTime, coords = coords, amount= 1}) -- if no table in coords found
+    table.insert(antifarm[source], { time = curentTime, coords = coords, amount = 1 }) -- if no table in coords found
     return true
 end
 
-function map(x, in_min, in_max, out_min, out_max)
+local function map(x, in_min, in_max, out_min, out_max)
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 end
 
--- lib.addCommand('group.admin', 'giveCarcass', function(source, args)
---     for key, value in pairs(Config.carcass) do
---         exports.ox_inventory:AddItem(source, value, 1, {type = '★☆☆', image =  value..1})
---         exports.ox_inventory:AddItem(source, value, 1, {type = '★★☆', image =  value..2})
---         exports.ox_inventory:AddItem(source, value, 1, {type = '★★★', image =  value..3})
---     end
--- end)
+RegisterNetEvent('nfire_hunting:server:harvestCarcass')
+AddEventHandler('nfire_hunting:server:harvestCarcass', function(entityId, bone, weaponGroup)
+    local playerCoords = GetEntityCoords(GetPlayerPed(source))
+    local entity = NetworkGetEntityFromNetworkId(entityId)
+    local entityCoords = GetEntityCoords(entity)
+    if #(playerCoords - entityCoords) < 5 then
+        if antifarmFunction(source, entityCoords) then
+            local model = hashList[GetEntityModel(entity)]
+            local item = Config.carcass[model].item
+            local grade = '★☆☆'
+            local gradescale = 1
+            local image = item .. 1
 
--- lib.addCommand('group.admin', 'spawnPed', function(source, args)
---     local playerCoords = GetEntityCoords(GetPlayerPed(source))
---     local entity = CreatePed(0, GetHashKey(args.hash), playerCoords, true, true)
--- end,{'hash:string'})
+            if inTable(Config.goodWeapon, weaponGroup) then
+                gradescale = gradescale + 1
+            end
 
--- lib.addCommand('group.admin', 'printAntifarm', function(source, args)
---     print(json.encode(antifarm,{indent = true}))
--- end)
+            if inTable(Config.carcass[model].headshotBones, bone) then
+                gradescale = gradescale + 1
+            end
 
--- lib.addCommand('group.admin', 'printInv', function(source, args)
---     print(json.encode(exports.ox_inventory:Inventory(source).items,{indent = true}))
--- end)
+            if gradescale == 2 then
+                grade = '★★☆'
+                image = item .. 2
+            elseif gradescale == 3 then
+                grade = '★★★'
+                image = item .. 3
+            end
+
+            if exports.ox_inventory:CanCarryItem(source, item, 1) and DoesEntityExist(entity) and GetEntityAttachedTo(entity) == 0 then
+                exports.ox_inventory:AddItem(source, item, 1, { type = grade, image = image, model = model })
+                DeleteEntity(entity)
+            end
+        else
+            NotifyFunction(source, locale['stop_farm'], 'error')
+        end
+    else
+        NotifyFunction(source, locale['too_far'], 'error')
+    end
+end)
+
+RegisterNetEvent('nfire_hunting:server:SellCarcass')
+AddEventHandler('nfire_hunting:server:SellCarcass', function(item)
+    local itemData = exports.ox_inventory:Search(source, 'slots', item)[1]
+    if itemData.count >= 1 then
+        local reward = Config.carcass[itemData.metadata.model].max * Config.gradeMultiplier[itemData.metadata.type]
+        if Config.degrade and itemData.metadata.durability ~= nil then
+            local currentTime = os.time()
+            local maxTime = itemData.metadata.durability
+            local minTime = maxTime - itemData.metadata.degrade * 60
+            if currentTime >= maxTime then
+                currentTime = maxTime
+            end
+            reward = math.floor(map(currentTime, maxTime, minTime, Config.sellPrice[item].min * Config.gradeMultiplier[itemData.metadata.type], Config.sellPrice[item].max * Config.gradeMultiplier[itemData.metadata.type]))
+        end
+        exports.ox_inventory:RemoveItem(source, item, 1, nil, itemData.slot)
+        exports.ox_inventory:AddItem(source, 'money', reward)
+    end
+end)
+
+
+local function tagAnimal(payload)
+    local src = payload.source
+    TriggerClientEvent('ox_inventory:closeInventory', src)
+    TriggerClientEvent('nfire_hunting:client:applytag', src)
+    payload.toSlot.metadata.tagged = true
+    payload.toSlot.metadata.description = payload.toSlot.metadata.description .. "  \n" .. payload.fromSlot.metadata.description
+    Wait(6000)
+    ox_inventory:RemoveItem(src, 'tag', 1, payload.from.metadata)
+    ox_inventory:SetMetadata(src, payload.toSlot.metadata, payload.toSlot.metadata)
+end
+
+local tagHook = ox_inventory:registerHook('swapItems', function(payload)
+        if type(payload.toSlot) == "table" and not payload.toSlot.metadata.tagged and payload.fromInventory == payload.source then
+            tagAnimal(payload)
+            return false
+        end
+    end,
+    {
+        print = false,
+        itemFilter = {
+            tag = true
+        },
+    })
+
+RegisterNetEvent('nfire_hunting:server:issuetag')
+AddEventHandler('nfire_hunting:server:issuetag', function()
+    local src = source
+    local citizen = GetCitizenInfo(src)
+    if HasHuntingLicense(source) then
+        if not issuedTags[citizen.citizenid] then
+            local metadata = {
+                description = "Authorized To: " .. citizen.fullname .. "  \nIssued Date: " .. os.date("%m/%d/%y @ %I:%M")
+            }
+            issuedTags[citizen.citizenid] = true
+            exports.ox_inventory:AddItem(src, 'tag', 6, metadata)
+        else
+            NotifyFunction(src, locale["received_tags"], 'error')
+        end
+    else
+        NotifyFunction(src, locale["missing_license"], 'error')
+    end
+end)
+
+if Config.debug then
+    lib.addCommand('group.admin', 'giveCarcass', function(source, args)
+        for key, value in pairs(Config.carcass) do
+            exports.ox_inventory:AddItem(source, value, 1, { type = '★☆☆', image = value .. 1 })
+            exports.ox_inventory:AddItem(source, value, 1, { type = '★★☆', image = value .. 2 })
+            exports.ox_inventory:AddItem(source, value, 1, { type = '★★★', image = value .. 3 })
+        end
+    end)
+
+    lib.addCommand('group.admin', 'spawnPed', function(source, args)
+        local playerCoords = GetEntityCoords(GetPlayerPed(source))
+        local entity = CreatePed(0, GetHashKey(args.hash), playerCoords, true, true)
+    end, { 'hash:string' })
+
+    lib.addCommand('group.admin', 'printAntifarm', function(source, args)
+        print(json.encode(antifarm, { indent = true }))
+    end)
+
+    lib.addCommand('group.admin', 'printInv', function(source, args)
+        print(json.encode(exports.ox_inventory:Inventory(source).items, { indent = true }))
+    end)
+end
